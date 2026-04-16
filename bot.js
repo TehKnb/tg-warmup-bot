@@ -17,6 +17,7 @@ function generateToken() {
 }
 
 async function telegram(method, payload) {
+    console.log('TELEGRAM CALL:', method, payload);
   const res = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/${method}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -24,6 +25,7 @@ async function telegram(method, payload) {
   });
 
   const data = await res.json();
+  console.log('TELEGRAM RESPONSE:', data);
 
   if (!data.ok) {
     throw new Error(JSON.stringify(data));
@@ -68,10 +70,14 @@ app.get('/', (req, res) => {
 });
 
 app.post('/telegram/webhook', async (req, res) => {
+    console.log('WEBHOOK HIT');
+    console.log('BODY:', JSON.stringify(req.body));
+
   try {
     const update = req.body;
 
     if (!update.message || !update.message.text) {
+        console.log('NO MESSAGE TEXT');
       return res.sendStatus(200);
     }
 
@@ -79,6 +85,9 @@ app.post('/telegram/webhook', async (req, res) => {
     const text = message.text.trim();
     const chatId = String(message.chat.id);
     const telegramUserId = String(message.from.id);
+    console.log('TEXT:', text);
+    console.log('CHAT ID:', chatId);
+    console.log('USER ID:', telegramUserId);
     const username = message.from.username || null;
     const firstName = message.from.first_name || null;
 
