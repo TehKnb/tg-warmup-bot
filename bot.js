@@ -202,5 +202,6 @@ async function start() {
     process.exit(1);
   }
 }
-
+console.log('DATABASE_URL exists:', !!process.env.DATABASE_URL);
+console.log('DATABASE_URL prefix:', process.env.DATABASE_URL?.slice(0, 18));
 start();
