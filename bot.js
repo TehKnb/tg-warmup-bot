@@ -2,7 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const crypto = require('crypto');
 const cron = require('node-cron');
-const db = require('./db');
+const { pool, initDb } = require('./db');
 
 const app = express();
 app.use(express.json());
@@ -49,17 +49,16 @@ function addMinutes(date, minutes) {
 }
 
 function scheduleFirstMessageTime() {
-  return addMinutes(new Date(), 5).toISOString(); // перше повідомлення через 5 хв
+  return addMinutes(new Date(), 5).toISOString();
 }
 
 function scheduleNextByStep(step) {
   const now = new Date();
 
-  // 1-е через 5 хв, 2-е через 1 год, 3-є через 24 год
   if (step === 1) return addMinutes(now, 60).toISOString();
   if (step === 2) return addMinutes(now, 24 * 60).toISOString();
 
-  return null; // більше не слати
+  return null;
 }
 
 app.post('/telegram/webhook', async (req, res) => {
@@ -78,15 +77,18 @@ app.post('/telegram/webhook', async (req, res) => {
     const firstName = message.from.first_name || null;
 
     if (text.startsWith('/start')) {
-      let user = db.prepare(`
-        SELECT * FROM users WHERE telegram_user_id = ?
-      `).get(telegramUserId);
+      let result = await pool.query(
+        `SELECT * FROM users WHERE telegram_user_id = $1`,
+        [telegramUserId]
+      );
+
+      let user = result.rows[0];
 
       if (!user) {
         const leadToken = generateToken();
 
-        db.prepare(`
-          INSERT INTO users (
+        await pool.query(
+          `INSERT INTO users (
             telegram_user_id,
             chat_id,
             username,
@@ -96,26 +98,30 @@ app.post('/telegram/webhook', async (req, res) => {
             started_at,
             next_message_at,
             last_sent_step
-          ) VALUES (?, ?, ?, ?, ?, 'warming', ?, ?, 0)
-        `).run(
-          telegramUserId,
-          chatId,
-          username,
-          firstName,
-          leadToken,
-          new Date().toISOString(),
-          scheduleFirstMessageTime()
+          ) VALUES ($1, $2, $3, $4, $5, 'warming', $6, $7, 0)`,
+          [
+            telegramUserId,
+            chatId,
+            username,
+            firstName,
+            leadToken,
+            new Date().toISOString(),
+            scheduleFirstMessageTime()
+          ]
         );
 
-        user = db.prepare(`
-          SELECT * FROM users WHERE telegram_user_id = ?
-        `).get(telegramUserId);
+        result = await pool.query(
+          `SELECT * FROM users WHERE telegram_user_id = $1`,
+          [telegramUserId]
+        );
+        user = result.rows[0];
       } else {
-        db.prepare(`
-          UPDATE users
-          SET chat_id = ?, username = ?, first_name = ?, status = 'warming'
-          WHERE telegram_user_id = ?
-        `).run(chatId, username, firstName, telegramUserId);
+        await pool.query(
+          `UPDATE users
+           SET chat_id = $1, username = $2, first_name = $3, status = 'warming'
+           WHERE telegram_user_id = $4`,
+          [chatId, username, firstName, telegramUserId]
+        );
       }
 
       await telegram('sendMessage', {
@@ -131,28 +137,28 @@ app.post('/telegram/webhook', async (req, res) => {
   }
 });
 
-// Крон раз на хвилину перевіряє, кому пора слати повідомлення
 cron.schedule('* * * * *', async () => {
   try {
-    const nowIso = new Date().toISOString();
+    const result = await pool.query(
+      `SELECT * FROM users
+       WHERE status = 'warming'
+         AND next_message_at IS NOT NULL
+         AND next_message_at <= NOW()`
+    );
 
-    const users = db.prepare(`
-      SELECT * FROM users
-      WHERE status = 'warming'
-        AND next_message_at IS NOT NULL
-        AND next_message_at <= ?
-    `).all(nowIso);
+    const users = result.rows;
 
     for (const user of users) {
       const messages = getWarmupMessages(user.lead_token);
       const nextStep = user.last_sent_step + 1;
 
       if (!messages[user.last_sent_step]) {
-        db.prepare(`
-          UPDATE users
-          SET next_message_at = NULL
-          WHERE id = ?
-        `).run(user.id);
+        await pool.query(
+          `UPDATE users
+           SET next_message_at = NULL
+           WHERE id = $1`,
+          [user.id]
+        );
         continue;
       }
 
@@ -163,26 +169,38 @@ cron.schedule('* * * * *', async () => {
 
       const nextMessageAt = scheduleNextByStep(nextStep);
 
-      db.prepare(`
-        UPDATE users
-        SET last_sent_step = ?, next_message_at = ?
-        WHERE id = ?
-      `).run(nextStep, nextMessageAt, user.id);
+      await pool.query(
+        `UPDATE users
+         SET last_sent_step = $1, next_message_at = $2
+         WHERE id = $3`,
+        [nextStep, nextMessageAt, user.id]
+      );
     }
   } catch (error) {
     console.error('CRON ERROR:', error);
   }
 });
 
-app.listen(PORT, async () => {
+async function start() {
   try {
-    await telegram('setWebhook', {
-      url: `${BASE_URL}/telegram/webhook`
-    });
+    await initDb();
 
-    console.log(`Server running on port ${PORT}`);
-    console.log(`Webhook set to ${BASE_URL}/telegram/webhook`);
+    app.listen(PORT, async () => {
+      try {
+        await telegram('setWebhook', {
+          url: `${BASE_URL}/telegram/webhook`
+        });
+
+        console.log(`Server running on port ${PORT}`);
+        console.log(`Webhook set to ${BASE_URL}/telegram/webhook`);
+      } catch (error) {
+        console.error('SET WEBHOOK ERROR:', error);
+      }
+    });
   } catch (error) {
-    console.error('SET WEBHOOK ERROR:', error);
+    console.error('START ERROR:', error);
+    process.exit(1);
   }
-});
+}
+
+start();
