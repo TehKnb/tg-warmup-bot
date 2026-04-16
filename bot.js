@@ -24,9 +24,11 @@ async function telegram(method, payload) {
   });
 
   const data = await res.json();
+
   if (!data.ok) {
     throw new Error(JSON.stringify(data));
   }
+
   return data;
 }
 
@@ -60,6 +62,10 @@ function scheduleNextByStep(step) {
 
   return null;
 }
+
+app.get('/', (req, res) => {
+  res.json({ ok: true, service: 'tg-warmup-bot' });
+});
 
 app.post('/telegram/webhook', async (req, res) => {
   try {
@@ -118,16 +124,102 @@ app.post('/telegram/webhook', async (req, res) => {
       } else {
         await pool.query(
           `UPDATE users
-           SET chat_id = $1, username = $2, first_name = $3, status = 'warming'
-           WHERE telegram_user_id = $4`,
-          [chatId, username, firstName, telegramUserId]
+           SET chat_id = $1,
+               username = $2,
+               first_name = $3,
+               status = 'warming',
+               next_message_at = $4,
+               last_sent_step = 0
+           WHERE telegram_user_id = $5`,
+          [
+            chatId,
+            username,
+            firstName,
+            scheduleFirstMessageTime(),
+            telegramUserId
+          ]
         );
+
+        result = await pool.query(
+          `SELECT * FROM users WHERE telegram_user_id = $1`,
+          [telegramUserId]
+        );
+        user = result.rows[0];
       }
 
       await telegram('sendMessage', {
         chat_id: chatId,
         text: 'Вас успішно підключено. Незабаром надішлю перше повідомлення.'
       });
+
+      return res.sendStatus(200);
+    }
+
+    if (text === '/me') {
+      const result = await pool.query(
+        `SELECT id, telegram_user_id, chat_id, username, first_name, lead_token, status, started_at, next_message_at, last_sent_step
+         FROM users
+         WHERE telegram_user_id = $1`,
+        [telegramUserId]
+      );
+
+      const user = result.rows[0];
+
+      if (!user) {
+        await telegram('sendMessage', {
+          chat_id: chatId,
+          text: 'Користувача ще немає в базі. Спочатку натисніть /start'
+        });
+      } else {
+        await telegram('sendMessage', {
+          chat_id: chatId,
+          text:
+            `ID: ${user.id}\n` +
+            `telegram_user_id: ${user.telegram_user_id}\n` +
+            `chat_id: ${user.chat_id}\n` +
+            `username: ${user.username || '-'}\n` +
+            `first_name: ${user.first_name || '-'}\n` +
+            `lead_token: ${user.lead_token}\n` +
+            `status: ${user.status}\n` +
+            `started_at: ${user.started_at}\n` +
+            `next_message_at: ${user.next_message_at || '-'}\n` +
+            `last_sent_step: ${user.last_sent_step}`
+        });
+      }
+
+      return res.sendStatus(200);
+    }
+
+    if (text === '/reset') {
+      const result = await pool.query(
+        `SELECT * FROM users WHERE telegram_user_id = $1`,
+        [telegramUserId]
+      );
+
+      const user = result.rows[0];
+
+      if (!user) {
+        await telegram('sendMessage', {
+          chat_id: chatId,
+          text: 'Користувача ще немає в базі. Спочатку натисніть /start'
+        });
+      } else {
+        await pool.query(
+          `UPDATE users
+           SET status = 'warming',
+               next_message_at = $1,
+               last_sent_step = 0
+           WHERE telegram_user_id = $2`,
+          [scheduleFirstMessageTime(), telegramUserId]
+        );
+
+        await telegram('sendMessage', {
+          chat_id: chatId,
+          text: 'Прогрів скинуто. Перше повідомлення знову прийде за розкладом.'
+        });
+      }
+
+      return res.sendStatus(200);
     }
 
     res.sendStatus(200);
@@ -137,13 +229,44 @@ app.post('/telegram/webhook', async (req, res) => {
   }
 });
 
+app.post('/lead', async (req, res) => {
+  try {
+    const { lead_token } = req.body;
+
+    if (!lead_token) {
+      return res.status(400).json({ ok: false, error: 'No lead_token provided' });
+    }
+
+    const result = await pool.query(
+      `UPDATE users
+       SET status = 'converted',
+           next_message_at = NULL
+       WHERE lead_token = $1
+       RETURNING id, telegram_user_id, lead_token, status`,
+      [lead_token]
+    );
+
+    if (!result.rows.length) {
+      return res.status(404).json({ ok: false, error: 'User not found by lead_token' });
+    }
+
+    console.log('Lead converted:', result.rows[0]);
+
+    return res.json({ ok: true, user: result.rows[0] });
+  } catch (error) {
+    console.error('LEAD ERROR:', error);
+    return res.status(500).json({ ok: false, error: 'Server error' });
+  }
+});
+
 cron.schedule('* * * * *', async () => {
   try {
     const result = await pool.query(
       `SELECT * FROM users
        WHERE status = 'warming'
          AND next_message_at IS NOT NULL
-         AND next_message_at <= NOW()`
+         AND next_message_at <= NOW()
+       ORDER BY id ASC`
     );
 
     const users = result.rows;
@@ -151,8 +274,9 @@ cron.schedule('* * * * *', async () => {
     for (const user of users) {
       const messages = getWarmupMessages(user.lead_token);
       const nextStep = user.last_sent_step + 1;
+      const currentMessage = messages[user.last_sent_step];
 
-      if (!messages[user.last_sent_step]) {
+      if (!currentMessage) {
         await pool.query(
           `UPDATE users
            SET next_message_at = NULL
@@ -164,14 +288,15 @@ cron.schedule('* * * * *', async () => {
 
       await telegram('sendMessage', {
         chat_id: user.chat_id,
-        text: messages[user.last_sent_step]
+        text: currentMessage
       });
 
       const nextMessageAt = scheduleNextByStep(nextStep);
 
       await pool.query(
         `UPDATE users
-         SET last_sent_step = $1, next_message_at = $2
+         SET last_sent_step = $1,
+             next_message_at = $2
          WHERE id = $3`,
         [nextStep, nextMessageAt, user.id]
       );
@@ -202,6 +327,5 @@ async function start() {
     process.exit(1);
   }
 }
-console.log('DATABASE_URL exists:', !!process.env.DATABASE_URL);
-console.log('DATABASE_URL prefix:', process.env.DATABASE_URL?.slice(0, 18));
+
 start();
