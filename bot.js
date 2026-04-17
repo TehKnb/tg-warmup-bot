@@ -97,13 +97,27 @@ async function sendNotSubscribed(chatId) {
   });
 }
 
-async function sendBonusLink(chatId) {
+async function sendBonusLink(chatId, telegramUserId) {
+  const result = await pool.query(
+    `SELECT lead_token FROM users WHERE telegram_user_id = $1`,
+    [telegramUserId]
+  );
+
+  const user = result.rows[0];
+
+  if (!user) {
+    console.error('USER NOT FOUND FOR BONUS LINK');
+    return;
+  }
+
+  const link = `${LANDING_URL}?lead_token=${encodeURIComponent(user.lead_token)}`;
+
   await telegram('sendMessage', {
     chat_id: chatId,
     text: 'Бонусні розбори вже чекають вас тут:',
     reply_markup: {
       inline_keyboard: [
-        [{ text: 'Забрати бонус!', url: LANDING_URL }]
+        [{ text: 'Забрати бонус!', url: link }]
       ]
     }
   });
