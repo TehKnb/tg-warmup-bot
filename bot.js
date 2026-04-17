@@ -798,40 +798,40 @@ app.post('/telegram/webhook', async (req, res) => {
 
         return res.sendStatus(200);
       }
-
       if (data === 'check_subscription') {
-  const subscribed = await isSubscribedToChannel(telegramUserId);
+        const subscribed = await isSubscribedToChannel(telegramUserId);
 
-  await telegram('answerCallbackQuery', {
-    callback_query_id: callbackQueryId
-  });
+        await telegram('answerCallbackQuery', {
+          callback_query_id: callbackQueryId
+        });
 
-  if (!subscribed) {
-    await pool.query(
-      `UPDATE users
-       SET status = 'awaiting_subscription',
-           next_message_at = $1
-       WHERE telegram_user_id = $2`,
-      [getNextSlotDateUtc(), telegramUserId]
-    );
+        if (!subscribed) {
+          await pool.query(
+            `UPDATE users
+            SET status = 'awaiting_subscription',
+                next_message_at = $1
+            WHERE telegram_user_id = $2`,
+            [getNextSlotDateUtc(), telegramUserId]
+          );
 
-    await sendNotSubscribed(chatId);
-    return res.sendStatus(200);
-  }
+          await sendNotSubscribed(chatId);
+          return res.sendStatus(200);
+        }
 
-  await pool.query(
-    `UPDATE users
-     SET status = 'warming',
-         subscribed_at = NOW(),
-         next_message_at = $1,
-         last_sent_step = 0
-     WHERE telegram_user_id = $2`,
-    [getNextSlotDateUtc(), telegramUserId]
-  );
+        await pool.query(
+          `UPDATE users
+          SET status = 'warming',
+              subscribed_at = NOW(),
+              next_message_at = $1,
+              last_sent_step = 0
+          WHERE telegram_user_id = $2`,
+          [getNextSlotDateUtc(), telegramUserId]
+        );
 
+        await sendBonusLink(chatId, telegramUserId);
 
-  return res.sendStatus(200);
-}
+        return res.sendStatus(200);
+      }
 
       return res.sendStatus(200);
     }
