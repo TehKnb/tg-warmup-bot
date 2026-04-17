@@ -101,6 +101,23 @@ app.post('/telegram/webhook', async (req, res) => {
       return res.sendStatus(200);
     }
 
+    if (text === '/forget') {
+      await pool.query(
+        `DELETE FROM users WHERE telegram_user_id = $1`,
+        [telegramUserId]
+      );
+
+      await telegram('sendMessage', {
+        chat_id: chatId,
+        text: 'Ваші дані видалено. Бот вас більше не пам’ятає. Щоб почати заново, натисніть /start',
+        reply_markup: {
+          remove_keyboard: true
+        }
+      });
+
+      return res.sendStatus(200);
+    }
+
     // 2. Пользователь нажал кнопку Старт
     if (text === 'Старт' || text === '🚀 Старт') {
       let result = await pool.query(
