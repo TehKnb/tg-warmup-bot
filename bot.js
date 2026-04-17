@@ -66,6 +66,138 @@ async function isSubscribedToChannel(userId) {
   }
 }
 
+function getKyivNowParts() {
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Europe/Kyiv',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23'
+  });
+
+  const parts = formatter.formatToParts(new Date());
+  const map = {};
+
+  for (const part of parts) {
+    if (part.type !== 'literal') {
+      map[part.type] = part.value;
+    }
+  }
+
+  return {
+    year: Number(map.year),
+    month: Number(map.month),
+    day: Number(map.day),
+    hour: Number(map.hour),
+    minute: Number(map.minute)
+  };
+}
+
+function getSlotLabel(hour) {
+  if (hour === 11) return '11:00';
+  if (hour === 15) return '15:00';
+  if (hour === 18) return '18:00';
+  return null;
+}
+
+function getCurrentKyivSlotKey() {
+  const now = getKyivNowParts();
+  const slot = getSlotLabel(now.hour);
+
+  if (!slot || now.minute !== 0) return null;
+
+  const mm = String(now.month).padStart(2, '0');
+  const dd = String(now.day).padStart(2, '0');
+
+  return `${now.year}-${mm}-${dd} ${slot}`;
+}
+
+function getNextSlotDateUtc(fromDate = new Date()) {
+  const kyivFormatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Europe/Kyiv',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hourCycle: 'h23'
+  });
+
+  function getParts(date) {
+    const parts = kyivFormatter.formatToParts(date);
+    const map = {};
+    for (const part of parts) {
+      if (part.type !== 'literal') map[part.type] = part.value;
+    }
+    return {
+      year: Number(map.year),
+      month: Number(map.month),
+      day: Number(map.day),
+      hour: Number(map.hour),
+      minute: Number(map.minute),
+      second: Number(map.second)
+    };
+  }
+
+  const slots = [11, 15, 18];
+  const nowKyiv = getParts(fromDate);
+
+  for (const slotHour of slots) {
+    if (
+      nowKyiv.hour < slotHour ||
+      (nowKyiv.hour === slotHour && nowKyiv.minute === 0 && nowKyiv.second === 0)
+    ) {
+      return kyivLocalToUtc(nowKyiv.year, nowKyiv.month, nowKyiv.day, slotHour, 0, 0);
+    }
+  }
+
+  const tomorrow = new Date(fromDate.getTime() + 24 * 60 * 60 * 1000);
+  const t = getParts(tomorrow);
+  return kyivLocalToUtc(t.year, t.month, t.day, 11, 0, 0);
+}
+
+function kyivLocalToUtc(year, month, day, hour, minute, second) {
+  const approxUtc = new Date(Date.UTC(year, month - 1, day, hour, minute, second));
+
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Europe/Kyiv',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hourCycle: 'h23'
+  });
+
+  const parts = formatter.formatToParts(approxUtc);
+  const map = {};
+  for (const part of parts) {
+    if (part.type !== 'literal') map[part.type] = part.value;
+  }
+
+  const kyivAsIfUtc = Date.UTC(
+    Number(map.year),
+    Number(map.month) - 1,
+    Number(map.day),
+    Number(map.hour),
+    Number(map.minute),
+    Number(map.second)
+  );
+
+  const targetAsUtc = Date.UTC(year, month - 1, day, hour, minute, second);
+  const offsetMs = kyivAsIfUtc - approxUtc.getTime();
+
+  return new Date(targetAsUtc - offsetMs);
+}
+
+function buildLandingLink(leadToken) {
+  return `${LANDING_URL}?lead_token=${encodeURIComponent(leadToken)}`;
+}
+
 async function sendWarmupIntro(chatId, firstName) {
   const name = getDisplayName(firstName);
 
@@ -126,14 +258,313 @@ function buildLandingLink(leadToken) {
   return `${LANDING_URL}?lead_token=${encodeURIComponent(leadToken)}`;
 }
 
-function getWarmupMessages(leadToken) {
+function getWarmupPosts(leadToken) {
   const link = buildLandingLink(leadToken);
 
   return [
-    `Привіт! Підготували для вас матеріал.\n\nПерейдіть за посиланням:\n${link}`,
-    `Надсилаю ще раз посилання, щоб не загубилось:\n${link}`,
-    `Якщо актуально, залиште контакти на сторінці:\n${link}`
+    {
+      type: 'text',
+      parse_mode: 'HTML',
+      text:
+`Що таке “Стратегія керованого зростання”?
+
+Це 7 тижнів практичної роботи над вашим бізнесом із експертами в наймі, продажах та маркетингу, які мають <b>понад 10 років досвіду роботи з підприємцями!</b>
+
+Наша програма націлена на те, щоб ви уже під час навчання навели порядок у процесах, побачили точки зросту та почали рости в цифрах!
+
+За ці 7 тижнів ви:
+• розберетеся з показниками бізнесу і побачите, де втрачаєте гроші;
+• вибудуєте системний найм і перестанете тягнути все на собі;
+• налагодите стабільний потік заявок в онлайні;
+• вийдете з операційки та почнете справді керувати своїм бізнесом.
+
+Якщо ви відчуваєте, що вперлись у “стелю” прибутку або хочете масштабуватися без постійного хаосу — ця програма саме для вас!`
+    },
+
+    {
+      type: 'text',
+      parse_mode: 'HTML',
+      text:
+`ХТО Ж ТАКИЙ ОЛЕКСАНДР МОРОЗОВ?
+
+Це людина, з якої починається Клуб «Конс на Бі$»!
+
+Уже 12+ років він допомагає підприємцям збільшувати прибуток, вибудовувати системність і масштабуватися!
+
+І за цей час:
+- 50 000 підприємців побувало на подіях Олександра;
+- тисячі підприємців пройшли через 1000+ стратегічних сесій від нього;
+- 7500 учасників пройшли його 7-тижневі програми та інтенсиви.
+
+Олександр не просто навчає — він створив середовище, яке не просто змінить ваше мислення, а й викликатиме звичку ЗРОСТАТИ!`
+    },
+
+    {
+      type: 'media_group_then_button',
+      media: [
+        { type: 'photo', media: 'https://i.ibb.co/ZpCqjTMF/image.png' },
+        { type: 'photo', media: 'https://i.ibb.co/SX5LJ6nn/image.png' },
+        { type: 'photo', media: 'https://i.ibb.co/9kXqMJNQ/image.png' },
+        { type: 'photo', media: 'https://i.ibb.co/4gXRndCg/image.png' }
+      ],
+      followup_text: 'Хочете мати такі ж результати?',
+      button_text: 'Заповнюйте анкету тут!',
+      button_url: link
+    },
+
+    {
+      type: 'button_text',
+      text:
+`Якщо у вас досі є сумніви і ви не знаєте, чи підійде навчання саме вам, отримайте безкоштовну консультацію від нашого спеціаліста😉`,
+      button_text: 'Хочу на консультацію!',
+      button_url: link
+    },
+
+    {
+      type: 'videos_then_button',
+      videos: [
+        // ВСТАВИШ 5 ПРЯМИХ URL НА ВІДЕО АБО file_id
+        // { type: 'video', media: '...' }
+      ],
+      followup_text:
+`Думаєте, що ваша ніша занадто вузька? Просто подивіться ці відео.
+Наш Клуб працює із сотнями ніш! І кожен з підприємців отримує круті результати.
+
+Якщо ви шукаєте оточення, де кожен знає, як збільшити прибуток свого бізнесу — чекаємо вас у Конс на Бі$ 😉`,
+      button_text: 'ХОЧУ В КЛУБ!',
+      button_url: link
+    },
+
+    {
+      type: 'media_group_then_button_text',
+      parse_mode: 'HTML',
+      media: [
+        { type: 'photo', media: 'https://i.ibb.co/mrdvPnRY/image-2026-04-17-12-45-18.jpg' },
+        { type: 'photo', media: 'https://i.ibb.co/FbMk9qbK/photo-2026-04-17-12-47-03.jpg' }
+      ],
+      followup_text:
+`А ХТО ЩЕ З ЕКСПЕРТІВ СУПРОВОДЖУЄ ПІДПРИЄМЦІВ У НАВЧАННІ?
+
+<u><b>АННА МОРОЗОВА</b></u>
+співзасновниця нашого Бізнес-Клубу
+маркетолог-практик
+
+Анна <b>понад 15</b> років допомагає підприємцям масштабувати бізнес через системний маркетинг і продажі.
+
+Анна — авторка та спікерка десятків навчальних програм для власників малого та середнього бізнесу. І зараз вона ділиться лише тими інструментами, які випробувала в реальних бізнесах!
+
+<u><b>ЖАННА АНТОНОВА</b></u>
+спікерка нашого Клубу у напрямку маркетингу
+
+У SMM Жанна вже <b>понад 3 роки.</b>
+І за цей час вона встигла попрацювати уже зі <b>100+ нішами</b>: від невеликих онлайн-магазинів до великих компаній!
+
+Жанна — учениця Олександра Морозова.
+І усе, що вона передає підприємцям сьогодні — це практичні поради, які є результатом довгої та складної роботи: аналізу, пошуку ідей та форматів та постійного тестування.
+
+ДЕ МОЖНА ПОЧУТИ ЖАННУ?
+На 1 модулі “Магія ефективного маркетингу” та 4 модулі «Instagram як система»
+
+а також практикумах:
+• «Instagram під ключ 4.0»
+• «SMM-спеціаліст у вашому бізнесі»
+• «Зелені воронки: креативи, що працюють»
+• «Контент-ревізія сторінок Instagram»
+• «Взаємодія контент-відділу та відділу трафіку» (2 частини)
+
+<u><b>А більше про інших спікерів ви зможете дізнатись тут:</b></u>`,
+      button_text: 'ПРО СПІКЕРІВ КЛУБУ',
+      button_url: 'https://t.me/c/3538911047/8'
+    },
+
+    {
+      type: 'video_then_button',
+      video: null, // ВСТАВИШ ПРЯМИЙ URL АБО file_id
+      followup_text:
+`Як бачите, Конс на Бі$ викликає довіру!
+І якщо ви хочете дізнатись, як ваш бізнес може змінитись завдяки нашому навчанню — заповнюйте анкету тут👇🏻`,
+      button_text: 'ХОЧУ В КЛУБ!',
+      button_url: link
+    },
+
+    {
+      type: 'text',
+      text:
+`Ми знаємо, що ви зберегли відео, але так і не проглянули його…
+В той час як ваші конкуренти уже долучаються до нашого Клубу та роблять свої перші результати!`
+    },
+
+    {
+      type: 'video_then_text',
+      parse_mode: 'HTML',
+      video: null, // ВСТАВИШ ПРЯМИЙ URL АБО file_id
+      followup_text:
+`<b>Все ще сумніваєтесь, що ваша ніша не підходить?</b>
+Подивіться, скільки підприємців приходить до нас із нестандартними нішами ⬆️
+Але завдяки отриманим знанням у Клубі вони знають, як можна зростати в прибутку і масштабуватись!`
+    },
+
+    {
+      type: 'button_text',
+      text:
+`Якщо ви навіть не можете переглянути відео від нас, то не дивуйтесь, що ваші конкуренти виграють!
+Щоб бути на крок попереду, почніть діяти вже ЗАРАЗ! Це ваш останній шанс потрапити в наш Клуб!`,
+      button_text: 'Заповнюйте анкету ТУТ!',
+      button_url: link
+    }
   ];
+}
+
+async function sendPostToUser(user) {
+  const posts = getWarmupPosts(user.lead_token);
+  const post = posts[user.last_sent_step];
+
+  if (!post) {
+    await pool.query(
+      `UPDATE users
+       SET next_message_at = NULL
+       WHERE id = $1`,
+      [user.id]
+    );
+    return;
+  }
+
+  if (post.type === 'text') {
+    await telegram('sendMessage', {
+      chat_id: user.chat_id,
+      text: post.text,
+      ...(post.parse_mode ? { parse_mode: post.parse_mode } : {})
+    });
+  }
+
+  if (post.type === 'button_text') {
+    await telegram('sendMessage', {
+      chat_id: user.chat_id,
+      text: post.text,
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: post.button_text, url: post.button_url }]
+        ]
+      }
+    });
+  }
+
+  if (post.type === 'media_group_then_button') {
+    await telegram('sendMediaGroup', {
+      chat_id: user.chat_id,
+      media: post.media
+    });
+
+    await telegram('sendMessage', {
+      chat_id: user.chat_id,
+      text: post.followup_text,
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: post.button_text, url: post.button_url }]
+        ]
+      }
+    });
+  }
+
+  if (post.type === 'media_group_then_button_text') {
+    await telegram('sendMediaGroup', {
+      chat_id: user.chat_id,
+      media: post.media
+    });
+
+    await telegram('sendMessage', {
+      chat_id: user.chat_id,
+      text: post.followup_text,
+      ...(post.parse_mode ? { parse_mode: post.parse_mode } : {}),
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: post.button_text, url: post.button_url }]
+        ]
+      }
+    });
+  }
+
+  if (post.type === 'videos_then_button') {
+    if (post.videos.length >= 2) {
+      await telegram('sendMediaGroup', {
+        chat_id: user.chat_id,
+        media: post.videos
+      });
+    }
+
+    await telegram('sendMessage', {
+      chat_id: user.chat_id,
+      text: post.followup_text,
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: post.button_text, url: post.button_url }]
+        ]
+      }
+    });
+  }
+
+  if (post.type === 'video_then_button') {
+    if (post.video) {
+      await telegram('sendVideo', {
+        chat_id: user.chat_id,
+        video: post.video
+      });
+    }
+
+    await telegram('sendMessage', {
+      chat_id: user.chat_id,
+      text: post.followup_text,
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: post.button_text, url: post.button_url }]
+        ]
+      }
+    });
+  }
+
+  if (post.type === 'video_then_text') {
+    if (post.video) {
+      await telegram('sendVideo', {
+        chat_id: user.chat_id,
+        video: post.video
+      });
+    }
+
+    await telegram('sendMessage', {
+      chat_id: user.chat_id,
+      text: post.followup_text,
+      ...(post.parse_mode ? { parse_mode: post.parse_mode } : {})
+    });
+  }
+
+  await pool.query(
+    `UPDATE users
+     SET last_sent_step = last_sent_step + 1,
+         next_message_at = $1
+     WHERE id = $2`,
+    [getNextSlotDateUtc(), user.id]
+  );
+}
+
+async function sendSubscriptionReminder(user) {
+  await telegram('sendMessage', {
+    chat_id: user.chat_id,
+    text:
+`Бонусний розбір вже чекає вас!
+Просто натисніть на кнопку нижче ⬇️`,
+    reply_markup: {
+      inline_keyboard: [
+        [{ text: 'Забрати бонус!', url: CHANNEL_URL }]
+      ]
+    }
+  });
+
+  await pool.query(
+    `UPDATE users
+     SET next_message_at = $1
+     WHERE id = $2`,
+    [getNextSlotDateUtc(), user.id]
+  );
 }
 
 function addMinutes(date, minutes) {
@@ -160,6 +591,7 @@ app.get('/', (req, res) => {
 app.post('/telegram/webhook', async (req, res) => {
   try {
     const update = req.body;
+     console.log(JSON.stringify(update, null, 2)); // 👈 ОСЬ ЦЕ
 
     // 1. inline-кнопки
     if (update.callback_query) {
@@ -234,20 +666,42 @@ app.post('/telegram/webhook', async (req, res) => {
       }
 
       if (data === 'check_subscription') {
-        const subscribed = await isSubscribedToChannel(telegramUserId);
+  const subscribed = await isSubscribedToChannel(telegramUserId);
 
-        await telegram('answerCallbackQuery', {
-          callback_query_id: callbackQueryId
-        });
+  await telegram('answerCallbackQuery', {
+    callback_query_id: callbackQueryId
+  });
 
-        if (!subscribed) {
-          await sendNotSubscribed(chatId);
-          return res.sendStatus(200);
-        }
+  if (!subscribed) {
+    await pool.query(
+      `UPDATE users
+       SET status = 'awaiting_subscription',
+           next_message_at = $1
+       WHERE telegram_user_id = $2`,
+      [getNextSlotDateUtc(), telegramUserId]
+    );
 
-        await sendBonusLink(chatId, telegramUserId);
-        return res.sendStatus(200);
-      }
+    await sendNotSubscribed(chatId);
+    return res.sendStatus(200);
+  }
+
+  await pool.query(
+    `UPDATE users
+     SET status = 'warming',
+         subscribed_at = NOW(),
+         next_message_at = $1,
+         last_sent_step = 0
+     WHERE telegram_user_id = $2`,
+    [getNextSlotDateUtc(), telegramUserId]
+  );
+
+  await telegram('sendMessage', {
+    chat_id: chatId,
+    text: 'Підписку підтверджено ✅ Перший матеріал надішлю у найближчий слот.'
+  });
+
+  return res.sendStatus(200);
+}
 
       return res.sendStatus(200);
     }
@@ -401,45 +855,39 @@ app.post('/lead', async (req, res) => {
 
 cron.schedule('* * * * *', async () => {
   try {
+    const slotKey = getCurrentKyivSlotKey();
+    if (!slotKey) return;
+
     const result = await pool.query(
       `SELECT * FROM users
-       WHERE status = 'warming'
+       WHERE status IN ('awaiting_subscription', 'warming')
          AND next_message_at IS NOT NULL
          AND next_message_at <= NOW()
-       ORDER BY id ASC`
+         AND (last_slot_key IS NULL OR last_slot_key <> $1)
+       ORDER BY id ASC`,
+      [slotKey]
     );
 
     const users = result.rows;
 
     for (const user of users) {
-      const messages = getWarmupMessages(user.lead_token);
-      const nextStep = user.last_sent_step + 1;
-      const currentMessage = messages[user.last_sent_step];
+      if (user.status === 'awaiting_subscription') {
+        await sendSubscriptionReminder(user);
 
-      if (!currentMessage) {
         await pool.query(
-          `UPDATE users
-           SET next_message_at = NULL
-           WHERE id = $1`,
-          [user.id]
+          `UPDATE users SET last_slot_key = $1 WHERE id = $2`,
+          [slotKey, user.id]
         );
-        continue;
       }
 
-      await telegram('sendMessage', {
-        chat_id: user.chat_id,
-        text: currentMessage
-      });
+      if (user.status === 'warming') {
+        await sendPostToUser(user);
 
-      const nextMessageAt = scheduleNextByStep(nextStep);
-
-      await pool.query(
-        `UPDATE users
-         SET last_sent_step = $1,
-             next_message_at = $2
-         WHERE id = $3`,
-        [nextStep, nextMessageAt, user.id]
-      );
+        await pool.query(
+          `UPDATE users SET last_slot_key = $1 WHERE id = $2`,
+          [slotKey, user.id]
+        );
+      }
     }
   } catch (error) {
     console.error('CRON ERROR:', error);
