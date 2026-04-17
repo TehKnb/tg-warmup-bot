@@ -245,7 +245,7 @@ app.post('/telegram/webhook', async (req, res) => {
           return res.sendStatus(200);
         }
 
-        await sendBonusLink(chatId);
+        await sendBonusLink(chatId, telegramUserId);
         return res.sendStatus(200);
       }
 
