@@ -102,6 +102,142 @@ function getSlotLabel(hour) {
   return null;
 }
 
+async function sendAllPosts(chatId, telegramUserId) {
+  const result = await pool.query(
+    `SELECT lead_token FROM users WHERE telegram_user_id = $1`,
+    [telegramUserId]
+  );
+
+  const user = result.rows[0];
+
+  if (!user) {
+    await telegram('sendMessage', {
+      chat_id: chatId,
+      text: 'Спочатку натисніть /start'
+    });
+    return;
+  }
+
+  const posts = getWarmupPosts(user.lead_token);
+
+  for (let i = 0; i < posts.length; i++) {
+    const post = posts[i];
+
+    // 👇 затримка щоб Telegram не душив flood limit
+    await new Promise(r => setTimeout(r, 1200));
+
+    if (post.type === 'text') {
+      await telegram('sendMessage', {
+        chat_id: chatId,
+        text: post.text,
+        ...(post.parse_mode ? { parse_mode: post.parse_mode } : {})
+      });
+    }
+
+    if (post.type === 'button_text') {
+      await telegram('sendMessage', {
+        chat_id: chatId,
+        text: post.text,
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: post.button_text, url: post.button_url }]
+          ]
+        }
+      });
+    }
+
+    if (post.type === 'media_group_then_button') {
+      await telegram('sendMediaGroup', {
+        chat_id: chatId,
+        media: post.media
+      });
+
+      await telegram('sendMessage', {
+        chat_id: chatId,
+        text: post.followup_text,
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: post.button_text, url: post.button_url }]
+          ]
+        }
+      });
+    }
+
+    if (post.type === 'media_group_then_button_text') {
+      await telegram('sendMediaGroup', {
+        chat_id: chatId,
+        media: post.media
+      });
+
+      await telegram('sendMessage', {
+        chat_id: chatId,
+        text: post.followup_text,
+        ...(post.parse_mode ? { parse_mode: post.parse_mode } : {}),
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: post.button_text, url: post.button_url }]
+          ]
+        }
+      });
+    }
+
+    if (post.type === 'videos_then_button') {
+      for (const videoId of post.videos) {
+        await telegram('sendVideo', {
+          chat_id: chatId,
+          video: videoId
+        });
+
+        await new Promise(r => setTimeout(r, 700));
+      }
+
+      await telegram('sendMessage', {
+        chat_id: chatId,
+        text: post.followup_text,
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: post.button_text, url: post.button_url }]
+          ]
+        }
+      });
+    }
+
+    if (post.type === 'video_then_button') {
+      if (post.video) {
+        await telegram('sendVideo', {
+          chat_id: chatId,
+          video: post.video
+        });
+      }
+
+      await telegram('sendMessage', {
+        chat_id: chatId,
+        text: post.followup_text,
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: post.button_text, url: post.button_url }]
+          ]
+        }
+      });
+    }
+
+    if (post.type === 'video_then_text') {
+      if (post.video) {
+        await telegram('sendVideo', {
+          chat_id: chatId,
+          video: post.video
+        });
+      }
+
+      await telegram('sendMessage', {
+        chat_id: chatId,
+        text: post.followup_text,
+        ...(post.parse_mode ? { parse_mode: post.parse_mode } : {})
+      });
+    }
+  }
+}
+
 function getCurrentKyivSlotKey() {
   const now = getKyivNowParts();
   const slot = getSlotLabel(now.hour);
@@ -254,9 +390,6 @@ async function sendBonusLink(chatId, telegramUserId) {
     }
   });
 }
-function buildLandingLink(leadToken) {
-  return `${LANDING_URL}?lead_token=${encodeURIComponent(leadToken)}`;
-}
 
 function getWarmupPosts(leadToken) {
   const link = buildLandingLink(leadToken);
@@ -323,8 +456,11 @@ function getWarmupPosts(leadToken) {
     {
       type: 'videos_then_button',
       videos: [
-        // ВСТАВИШ 5 ПРЯМИХ URL НА ВІДЕО АБО file_id
-        // { type: 'video', media: '...' }
+        'BAACAgIAAxkBAANUaeK7AjEuTv_LnA38bQ6Z3hRUbUMAAtWQAAL9DxlLGC5f7Jp18wABOwQ',
+        'BAACAgIAAxkBAANVaeK7zdmye-eKlY0AAXoNU_T6UOwBAALWkAAC_Q8ZS7cTu_PxJ1n-OwQ',
+        'BAACAgIAAxkBAANWaeK75CMGXQLznHYx274DLGoFjb4AAteQAAL9DxlLE0AAAZhJufJOOwQ',
+        'BAACAgIAAxkBAANXaeK8B1GpG-GK7LW4yH-PAAGqtaTfAALYkAAC_Q8ZS4xvIVfshALqOwQ',
+        'BAACAgIAAxkBAANYaeK8F2edqsoyOoT9esVT5j7VkX0AAtmQAAL9DxlLGBW_RXFBagE7BA'
       ],
       followup_text:
 `Думаєте, що ваша ніша занадто вузька? Просто подивіться ці відео.
@@ -379,7 +515,7 @@ function getWarmupPosts(leadToken) {
 
     {
       type: 'video_then_button',
-      video: null, // ВСТАВИШ ПРЯМИЙ URL АБО file_id
+      video: 'BAACAgIAAxkBAANZaeLAA4JL59LMaM1K7OzXLbKuWasAAtqQAAL9DxlLCgQHcgo8B6c7BA',
       followup_text:
 `Як бачите, Конс на Бі$ викликає довіру!
 І якщо ви хочете дізнатись, як ваш бізнес може змінитись завдяки нашому навчанню — заповнюйте анкету тут👇🏻`,
@@ -397,7 +533,7 @@ function getWarmupPosts(leadToken) {
     {
       type: 'video_then_text',
       parse_mode: 'HTML',
-      video: null, // ВСТАВИШ ПРЯМИЙ URL АБО file_id
+      video: 'BAACAgIAAxkBAANaaeLAphl2XTuMrwZv85tcsUcnZZMAAtyQAAL9DxlLeuYcW0BNigY7BA',
       followup_text:
 `<b>Все ще сумніваєтесь, що ваша ніша не підходить?</b>
 Подивіться, скільки підприємців приходить до нас із нестандартними нішами ⬆️
@@ -484,24 +620,25 @@ async function sendPostToUser(user) {
     });
   }
 
-  if (post.type === 'videos_then_button') {
-    if (post.videos.length >= 2) {
-      await telegram('sendMediaGroup', {
-        chat_id: user.chat_id,
-        media: post.videos
-      });
-    }
+ if (post.type === 'videos_then_button') {
 
-    await telegram('sendMessage', {
+  for (const videoId of post.videos) {
+    await telegram('sendVideo', {
       chat_id: user.chat_id,
-      text: post.followup_text,
-      reply_markup: {
-        inline_keyboard: [
-          [{ text: post.button_text, url: post.button_url }]
-        ]
-      }
+      video: videoId
     });
   }
+
+  await telegram('sendMessage', {
+    chat_id: user.chat_id,
+    text: post.followup_text,
+    reply_markup: {
+      inline_keyboard: [
+        [{ text: post.button_text, url: post.button_url }]
+      ]
+    }
+  });
+}
 
   if (post.type === 'video_then_button') {
     if (post.video) {
@@ -591,7 +728,6 @@ app.get('/', (req, res) => {
 app.post('/telegram/webhook', async (req, res) => {
   try {
     const update = req.body;
-     console.log(JSON.stringify(update, null, 2)); // 👈 ОСЬ ЦЕ
 
     // 1. inline-кнопки
     if (update.callback_query) {
@@ -625,15 +761,14 @@ app.post('/telegram/webhook', async (req, res) => {
               started_at,
               next_message_at,
               last_sent_step
-            ) VALUES ($1, $2, $3, $4, $5, 'warming', $6, $7, 0)`,
+            ) VALUES ($1, $2, $3, $4, $5, 'new', $6, NULL, 0)`,
             [
               telegramUserId,
               chatId,
               username,
               firstName,
               leadToken,
-              new Date().toISOString(),
-              scheduleFirstMessageTime()
+              new Date().toISOString()
             ]
           );
         } else {
@@ -642,8 +777,8 @@ app.post('/telegram/webhook', async (req, res) => {
             SET chat_id = $1,
                 username = $2,
                 first_name = $3,
-                status = 'warming',
-                next_message_at = $4,
+                status = 'new'
+                next_message_at = NULL
                 last_sent_step = 0
             WHERE telegram_user_id = $5`,
             [
@@ -695,10 +830,6 @@ app.post('/telegram/webhook', async (req, res) => {
     [getNextSlotDateUtc(), telegramUserId]
   );
 
-  await telegram('sendMessage', {
-    chat_id: chatId,
-    text: 'Підписку підтверджено ✅ Перший матеріал надішлю у найближчий слот.'
-  });
 
   return res.sendStatus(200);
 }
@@ -732,6 +863,11 @@ app.post('/telegram/webhook', async (req, res) => {
         }
       });
 
+      return res.sendStatus(200);
+    }
+
+    if (text === '/posts') {
+      await sendAllPosts(chatId, telegramUserId);
       return res.sendStatus(200);
     }
 
