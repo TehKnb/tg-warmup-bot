@@ -70,14 +70,12 @@ app.get('/', (req, res) => {
 });
 
 app.post('/telegram/webhook', async (req, res) => {
-    console.log('WEBHOOK HIT');
-    console.log('BODY:', JSON.stringify(req.body));
-
   try {
     const update = req.body;
 
+    console.log('WEBHOOK HIT:', JSON.stringify(update));
+
     if (!update.message || !update.message.text) {
-        console.log('NO MESSAGE TEXT');
       return res.sendStatus(200);
     }
 
@@ -85,13 +83,26 @@ app.post('/telegram/webhook', async (req, res) => {
     const text = message.text.trim();
     const chatId = String(message.chat.id);
     const telegramUserId = String(message.from.id);
-    console.log('TEXT:', text);
-    console.log('CHAT ID:', chatId);
-    console.log('USER ID:', telegramUserId);
     const username = message.from.username || null;
     const firstName = message.from.first_name || null;
 
-    if (text.startsWith('/start')) {
+    // 1. Пользователь только зашел в бота
+    if (text === '/start' || text.startsWith('/start ')) {
+      await telegram('sendMessage', {
+        chat_id: chatId,
+        text: 'Натисніть кнопку нижче, щоб почати 👇',
+        reply_markup: {
+          keyboard: [[{ text: 'Старт' }]],
+          resize_keyboard: true,
+          one_time_keyboard: true
+        }
+      });
+
+      return res.sendStatus(200);
+    }
+
+    // 2. Пользователь нажал кнопку Старт
+    if (text === 'Старт' || text === '🚀 Старт') {
       let result = await pool.query(
         `SELECT * FROM users WHERE telegram_user_id = $1`,
         [telegramUserId]
@@ -124,12 +135,6 @@ app.post('/telegram/webhook', async (req, res) => {
             scheduleFirstMessageTime()
           ]
         );
-
-        result = await pool.query(
-          `SELECT * FROM users WHERE telegram_user_id = $1`,
-          [telegramUserId]
-        );
-        user = result.rows[0];
       } else {
         await pool.query(
           `UPDATE users
@@ -148,101 +153,19 @@ app.post('/telegram/webhook', async (req, res) => {
             telegramUserId
           ]
         );
-
-        result = await pool.query(
-          `SELECT * FROM users WHERE telegram_user_id = $1`,
-          [telegramUserId]
-        );
-        user = result.rows[0];
       }
 
-      await telegram('sendMessage', {
+      await telegram('sendPhoto', {
         chat_id: chatId,
-        text: 'Вас успішно підключено. Незабаром надішлю перше повідомлення.'
+        photo: 'https://i.ibb.co/7h4WjNn/image.png',
+        caption: `Вас вітає український Бізнес-Клуб для підприємців «Конс на Бі$»!
+Місце, яке викликає у підприємців звичку ПОСТІЙНО ЗРОСТАТИ🔥`
       });
 
       return res.sendStatus(200);
     }
-    if (text === '/start') {
 
-  // 1. КНОПКА СТАРТ
-  await telegram('sendMessage', {
-    chat_id: chatId,
-    text: 'Натисніть кнопку нижче, щоб почати 👇',
-    reply_markup: {
-      keyboard: [
-        [{ text: '🚀 Старт' }]
-      ],
-      resize_keyboard: true,
-      one_time_keyboard: true
-    }
-  });
-
-  return res.sendStatus(200);
-}
-
-if (text === '🚀 Старт') {
-
-  // 2. СТВОРЕННЯ КОРИСТУВАЧА (твоя логіка)
-  let result = await pool.query(
-    `SELECT * FROM users WHERE telegram_user_id = $1`,
-    [telegramUserId]
-  );
-
-  let user = result.rows[0];
-
-  if (!user) {
-    const leadToken = generateToken();
-
-    await pool.query(
-      `INSERT INTO users (
-        telegram_user_id,
-        chat_id,
-        username,
-        first_name,
-        lead_token,
-        status,
-        started_at,
-        next_message_at,
-        last_sent_step
-      ) VALUES ($1, $2, $3, $4, $5, 'warming', $6, $7, 0)`,
-      [
-        telegramUserId,
-        chatId,
-        username,
-        firstName,
-        leadToken,
-        new Date().toISOString(),
-        scheduleFirstMessageTime()
-      ]
-    );
-  }
-
-  // 3. КАРТИНКА + ТЕКСТ
-  await telegram('sendPhoto', {
-    chat_id: chatId,
-    photo: 'https://i.ibb.co/7h4WjNn/image.png',
-    caption:
-`Вас вітає український Бізнес-Клуб для підприємців «Конс на Бі$»!
-Місце, яке викликає у підприємців звичку ПОСТІЙНО ЗРОСТАТИ🔥`
-  });
-
-  return res.sendStatus(200);
-}
-
-if (text === '/forget') {
-  await pool.query(
-    `DELETE FROM users WHERE telegram_user_id = $1`,
-    [telegramUserId]
-  );
-
-  await telegram('sendMessage', {
-    chat_id: chatId,
-    text: 'Ваші дані видалено. Тепер бот вас не памʼятає. Можете почати заново через /start'
-  });
-
-  return res.sendStatus(200);
-}
+    // /me
     if (text === '/me') {
       const result = await pool.query(
         `SELECT id, telegram_user_id, chat_id, username, first_name, lead_token, status, started_at, next_message_at, last_sent_step
@@ -278,42 +201,10 @@ if (text === '/forget') {
       return res.sendStatus(200);
     }
 
-    if (text === '/reset') {
-      const result = await pool.query(
-        `SELECT * FROM users WHERE telegram_user_id = $1`,
-        [telegramUserId]
-      );
-
-      const user = result.rows[0];
-
-      if (!user) {
-        await telegram('sendMessage', {
-          chat_id: chatId,
-          text: 'Користувача ще немає в базі. Спочатку натисніть /start'
-        });
-      } else {
-        await pool.query(
-          `UPDATE users
-           SET status = 'warming',
-               next_message_at = $1,
-               last_sent_step = 0
-           WHERE telegram_user_id = $2`,
-          [scheduleFirstMessageTime(), telegramUserId]
-        );
-
-        await telegram('sendMessage', {
-          chat_id: chatId,
-          text: 'Прогрів скинуто. Перше повідомлення знову прийде за розкладом.'
-        });
-      }
-
-      return res.sendStatus(200);
-    }
-
-    res.sendStatus(200);
+    return res.sendStatus(200);
   } catch (error) {
     console.error('WEBHOOK ERROR:', error);
-    res.sendStatus(500);
+    return res.sendStatus(500);
   }
 });
 
