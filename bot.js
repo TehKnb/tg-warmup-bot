@@ -10,6 +10,8 @@ app.use(express.json());
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const BASE_URL = process.env.BASE_URL;
 const LANDING_URL = process.env.LANDING_URL;
+const CHANNEL_ID = process.env.CHANNEL_ID;
+const CHANNEL_URL = process.env.CHANNEL_URL;
 const PORT = process.env.PORT || 3000;
 
 function generateToken() {
@@ -34,6 +36,78 @@ async function telegram(method, payload) {
   return data;
 }
 
+function escapeHtml(text) {
+  return String(text || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+function getDisplayName(firstName) {
+  return firstName ? escapeHtml(firstName) : 'друже';
+}
+
+async function getChatMember(chatId, userId) {
+  return telegram('getChatMember', {
+    chat_id: chatId,
+    user_id: Number(userId)
+  });
+}
+
+async function isSubscribedToChannel(userId) {
+  try {
+    const response = await getChatMember(CHANNEL_ID, userId);
+    const status = response?.result?.status;
+
+    return ['creator', 'administrator', 'member'].includes(status);
+  } catch (error) {
+    console.error('SUBSCRIPTION CHECK ERROR:', error);
+    return false;
+  }
+}
+
+async function sendWarmupIntro(chatId, firstName) {
+  const name = getDisplayName(firstName);
+
+  await telegram('sendMessage', {
+    chat_id: chatId,
+    parse_mode: 'HTML',
+    text:
+`${name}, ми підготували для вас бонусні розбори бізнесів, в яких Олександр Морозов на онлайн-зустрічах відповідає на питання підприємців та дає практичні поради для впровадження.
+
+Але спочатку перевіримо вашу підписку на наш канал:`,
+    reply_markup: {
+      inline_keyboard: [
+        [{ text: 'Готово✅', callback_data: 'check_subscription' }]
+      ]
+    }
+  });
+}
+
+async function sendNotSubscribed(chatId) {
+  await telegram('sendMessage', {
+    chat_id: chatId,
+    text: 'Не бачимо вашої підписки, спробуйте ще раз 👇🏻',
+    reply_markup: {
+      inline_keyboard: [
+        [{ text: 'Підписатись на канал', url: CHANNEL_URL }],
+        [{ text: 'Готово✅', callback_data: 'check_subscription' }]
+      ]
+    }
+  });
+}
+
+async function sendBonusLink(chatId) {
+  await telegram('sendMessage', {
+    chat_id: chatId,
+    text: 'Бонусні розбори вже чекають вас тут:',
+    reply_markup: {
+      inline_keyboard: [
+        [{ text: 'Забрати бонус!', url: LANDING_URL }]
+      ]
+    }
+  });
+}
 function buildLandingLink(leadToken) {
   return `${LANDING_URL}?lead_token=${encodeURIComponent(leadToken)}`;
 }
@@ -119,13 +193,13 @@ app.post('/telegram/webhook', async (req, res) => {
         } else {
           await pool.query(
             `UPDATE users
-             SET chat_id = $1,
-                 username = $2,
-                 first_name = $3,
-                 status = 'warming',
-                 next_message_at = $4,
-                 last_sent_step = 0
-             WHERE telegram_user_id = $5`,
+            SET chat_id = $1,
+                username = $2,
+                first_name = $3,
+                status = 'warming',
+                next_message_at = $4,
+                last_sent_step = 0
+            WHERE telegram_user_id = $5`,
             [
               chatId,
               username,
@@ -140,10 +214,25 @@ app.post('/telegram/webhook', async (req, res) => {
           callback_query_id: callbackQueryId
         });
 
-        await telegram('sendMessage', {
-          chat_id: chatId,
-          text: 'Готово. Незабаром надішлю перше повідомлення.'
+        await sendWarmupIntro(chatId, firstName);
+
+        return res.sendStatus(200);
+      }
+
+      if (data === 'check_subscription') {
+        const subscribed = await isSubscribedToChannel(telegramUserId);
+
+        await telegram('answerCallbackQuery', {
+          callback_query_id: callbackQueryId
         });
+
+        if (!subscribed) {
+          await sendNotSubscribed(chatId);
+          return res.sendStatus(200);
+        }
+
+        await sendBonusLink(chatId);
+        return res.sendStatus(200);
       }
 
       return res.sendStatus(200);
@@ -166,8 +255,8 @@ app.post('/telegram/webhook', async (req, res) => {
         chat_id: chatId,
         photo: 'https://i.ibb.co/7h4WjNn/image.png',
         caption:
-`Вас вітає український Бізнес-Клуб для підприємців «Конс на Бі$»!
-Місце, яке викликає у підприємців звичку ПОСТІЙНО ЗРОСТАТИ🔥`,
+        `Вас вітає український Бізнес-Клуб для підприємців «Конс на Бі$»!
+        Місце, яке викликає у підприємців звичку ПОСТІЙНО ЗРОСТАТИ🔥`,
         reply_markup: {
           inline_keyboard: [
             [{ text: 'Старт', callback_data: 'start_warmup' }]
