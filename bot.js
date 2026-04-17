@@ -221,7 +221,7 @@ if (text === '🚀 Старт') {
   // 3. КАРТИНКА + ТЕКСТ
   await telegram('sendPhoto', {
     chat_id: chatId,
-    photo: 'https://i.ibb.co/zdJRQHX/your-image.jpg',
+    photo: 'https://i.ibb.co/7h4WjNn/image.png',
     caption:
 `Вас вітає український Бізнес-Клуб для підприємців «Конс на Бі$»!
 Місце, яке викликає у підприємців звичку ПОСТІЙНО ЗРОСТАТИ🔥`
