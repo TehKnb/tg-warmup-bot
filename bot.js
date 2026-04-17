@@ -778,14 +778,13 @@ app.post('/telegram/webhook', async (req, res) => {
                 username = $2,
                 first_name = $3,
                 status = 'new',
-                next_message_at = NULL
+                next_message_at = NULL,
                 last_sent_step = 0
-            WHERE telegram_user_id = $5`,
+            WHERE telegram_user_id = $4`,
             [
               chatId,
               username,
               firstName,
-              scheduleFirstMessageTime(),
               telegramUserId
             ]
           );
