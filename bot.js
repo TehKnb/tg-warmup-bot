@@ -163,7 +163,72 @@ app.post('/telegram/webhook', async (req, res) => {
 
       return res.sendStatus(200);
     }
+    if (text === '/start') {
 
+  // 1. КНОПКА СТАРТ
+  await telegram('sendMessage', {
+    chat_id: chatId,
+    text: 'Натисніть кнопку нижче, щоб почати 👇',
+    reply_markup: {
+      keyboard: [
+        [{ text: '🚀 Старт' }]
+      ],
+      resize_keyboard: true,
+      one_time_keyboard: true
+    }
+  });
+
+  return res.sendStatus(200);
+}
+
+if (text === '🚀 Старт') {
+
+  // 2. СТВОРЕННЯ КОРИСТУВАЧА (твоя логіка)
+  let result = await pool.query(
+    `SELECT * FROM users WHERE telegram_user_id = $1`,
+    [telegramUserId]
+  );
+
+  let user = result.rows[0];
+
+  if (!user) {
+    const leadToken = generateToken();
+
+    await pool.query(
+      `INSERT INTO users (
+        telegram_user_id,
+        chat_id,
+        username,
+        first_name,
+        lead_token,
+        status,
+        started_at,
+        next_message_at,
+        last_sent_step
+      ) VALUES ($1, $2, $3, $4, $5, 'warming', $6, $7, 0)`,
+      [
+        telegramUserId,
+        chatId,
+        username,
+        firstName,
+        leadToken,
+        new Date().toISOString(),
+        scheduleFirstMessageTime()
+      ]
+    );
+  }
+
+  // 3. КАРТИНКА + ТЕКСТ
+  await telegram('sendPhoto', {
+    chat_id: chatId,
+    photo: 'https://i.ibb.co/zdJRQHX/your-image.jpg',
+    caption:
+`Вас вітає український Бізнес-Клуб для підприємців «Конс на Бі$»!
+Місце, яке викликає у підприємців звичку ПОСТІЙНО ЗРОСТАТИ🔥`
+  });
+
+  return res.sendStatus(200);
+}
     if (text === '/me') {
       const result = await pool.query(
         `SELECT id, telegram_user_id, chat_id, username, first_name, lead_token, status, started_at, next_message_at, last_sent_step
