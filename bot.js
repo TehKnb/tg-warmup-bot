@@ -229,6 +229,20 @@ if (text === '🚀 Старт') {
 
   return res.sendStatus(200);
 }
+
+if (text === '/forget') {
+  await pool.query(
+    `DELETE FROM users WHERE telegram_user_id = $1`,
+    [telegramUserId]
+  );
+
+  await telegram('sendMessage', {
+    chat_id: chatId,
+    text: 'Ваші дані видалено. Тепер бот вас не памʼятає. Можете почати заново через /start'
+  });
+
+  return res.sendStatus(200);
+}
     if (text === '/me') {
       const result = await pool.query(
         `SELECT id, telegram_user_id, chat_id, username, first_name, lead_token, status, started_at, next_message_at, last_sent_step
