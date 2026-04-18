@@ -853,8 +853,8 @@ app.post('/telegram/webhook', async (req, res) => {
         chat_id: chatId,
         photo: 'https://i.ibb.co/7h4WjNn/image.png',
         caption:
-        `Вас вітає український Бізнес-Клуб для підприємців «Конс на Бі$»!
-        Місце, яке викликає у підприємців звичку ПОСТІЙНО ЗРОСТАТИ🔥`,
+`Вас вітає український Бізнес-Клуб для підприємців «Конс на Бі$»!
+Місце, яке викликає у підприємців звичку ПОСТІЙНО ЗРОСТАТИ🔥`,
         reply_markup: {
           inline_keyboard: [
             [{ text: 'Старт', callback_data: 'start_warmup' }]
