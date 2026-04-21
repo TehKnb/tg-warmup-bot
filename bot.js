@@ -134,6 +134,15 @@ async function sendAllPosts(chatId, telegramUserId) {
       });
     }
 
+    if (post.type === 'photo_with_text') {
+      await telegram('sendPhoto', {
+        chat_id: chatId,
+        photo: post.photo,
+        caption: post.text,
+        parse_mode: post.parse_mode || undefined
+      });
+    }
+
     if (post.type === 'button_text') {
       await telegram('sendMessage', {
         chat_id: chatId,
@@ -341,9 +350,9 @@ async function sendWarmupIntro(chatId, firstName) {
     chat_id: chatId,
     parse_mode: 'HTML',
     text:
-`${name}, ми підготували для вас бонусні розбори бізнесів, в яких Олександр Морозов на онлайн-зустрічах відповідає на питання підприємців та дає практичні поради для впровадження.
+`${name}, ми підготували для вас <b>бонусні розбори бізнесів</b>, в яких Олександр Морозов на онлайн-зустрічах відповідає на питання підприємців та дає практичні поради для впровадження.
 
-Але спочатку перевіримо вашу підписку на наш канал:`,
+<i>Але спочатку перевіримо <b>вашу підписку на наш канал:</b></i>`,
     reply_markup: {
       inline_keyboard: [
         [{ text: 'Готово✅', callback_data: 'check_subscription' }]
@@ -382,7 +391,8 @@ async function sendBonusLink(chatId, telegramUserId) {
 
   await telegram('sendMessage', {
     chat_id: chatId,
-    text: 'Бонусні розбори вже чекають вас тут:',
+    text: '<i>Бонусні розбори вже чекають вас тут:</i>',
+    parse_mode: 'HTML',
     reply_markup: {
       inline_keyboard: [
         [{ text: 'Забрати бонус!', url: link }]
@@ -396,65 +406,70 @@ function getWarmupPosts(leadToken) {
 
   return [
     {
-      type: 'text',
+      type: 'photo_with_text',
       parse_mode: 'HTML',
+      photo: 'https://i.ibb.co/RTjMfkFR/photo-2026-04-21-10-48-04.jpg',
       text:
-`Що таке “Стратегія керованого зростання”?
+`<b>Що таке “Стратегія керованого зростання”?</b>
 
-Це 7 тижнів практичної роботи над вашим бізнесом із експертами в наймі, продажах та маркетингу, які мають <b>понад 10 років досвіду роботи з підприємцями!</b>
+Це <u>7 тижнів</u> практичної роботи над вашим бізнесом із експертами в наймі, продажах та маркетингу, які мають <b>понад 10 років досвіду роботи з підприємцями!</b>
 
-Наша програма націлена на те, щоб ви уже під час навчання навели порядок у процесах, побачили точки зросту та почали рости в цифрах!
+Наша програма націлена на те, щоб ви уже <b>під час навчання</b> навели порядок у процесах, побачили точки зросту та <i>почали рости в цифрах!</i>
 
-За ці 7 тижнів ви:
-• розберетеся з показниками бізнесу і побачите, де втрачаєте гроші;
-• вибудуєте системний найм і перестанете тягнути все на собі;
-• налагодите стабільний потік заявок в онлайні;
-• вийдете з операційки та почнете справді керувати своїм бізнесом.
+<b>За ці 7 тижнів ви:</b>
+• розберетеся з показниками бізнесу і побачите, <b>де втрачаєте гроші</b>;
+• вибудуєте <b>системний найм</b> і перестанете тягнути все на собі;
+• налагодите <b>стабільний потік заявок</b> в онлайні;
+• вийдете з операційки та <b>почнете справді керувати</b> своїм бізнесом.
 
-Якщо ви відчуваєте, що вперлись у “стелю” прибутку або хочете масштабуватися без постійного хаосу — ця програма саме для вас!`
+Якщо ви відчуваєте, що вперлись у “стелю” прибутку або хочете масштабуватися без постійного хаосу — <b>ця програма саме для вас!</b>`
     },
 
     {
-      type: 'text',
+      type: 'photo_with_text',
       parse_mode: 'HTML',
+      photo: 'https://i.ibb.co/FbCDznx2/image-2026-04-21-10-29-33.png',
       text:
-`ХТО Ж ТАКИЙ ОЛЕКСАНДР МОРОЗОВ?
+`<b>ХТО Ж ТАКИЙ ОЛЕКСАНДР МОРОЗОВ?</b>
 
-Це людина, з якої починається Клуб «Конс на Бі$»!
+<i>Це людина, з якої починається Клуб «Конс на Бі$»!</i>
 
 Уже 12+ років він допомагає підприємцям збільшувати прибуток, вибудовувати системність і масштабуватися!
 
-І за цей час:
+<i><b>І за цей час:</b>
 - 50 000 підприємців побувало на подіях Олександра;
 - тисячі підприємців пройшли через 1000+ стратегічних сесій від нього;
-- 7500 учасників пройшли його 7-тижневі програми та інтенсиви.
+- 7500 учасників пройшли його 7-тижневі програми та інтенсиви.</i>
 
-Олександр не просто навчає — він створив середовище, яке не просто змінить ваше мислення, а й викликатиме звичку ЗРОСТАТИ!`
+Олександр не просто навчає — він створив середовище, яке не просто змінить ваше мислення, а й <b>викликатиме звичку ЗРОСТАТИ!</b>`
     },
 
     {
       type: 'media_group_then_button',
+      parse_mode: 'HTML',
       media: [
         { type: 'photo', media: 'https://i.ibb.co/ZpCqjTMF/image.png' },
         { type: 'photo', media: 'https://i.ibb.co/SX5LJ6nn/image.png' },
         { type: 'photo', media: 'https://i.ibb.co/9kXqMJNQ/image.png' },
         { type: 'photo', media: 'https://i.ibb.co/4gXRndCg/image.png' }
       ],
-      followup_text: 'Хочете мати такі ж результати?',
+      followup_text: '<b>Хочете мати такі ж результати?</b>',
       button_text: 'Заповнюйте анкету тут!',
       button_url: link
     },
 
     {
       type: 'button_text',
+      parse_mode: 'HTML',
       text:
-`Якщо у вас досі є сумніви і ви не знаєте, чи підійде навчання саме вам, отримайте безкоштовну консультацію від нашого спеціаліста😉`,
+`Якщо у вас досі є сумніви і ви не знаєте, чи підійде навчання саме вам, <b>отримайте безкоштовну консультацію</b> від нашого спеціаліста 😉`,
       button_text: 'Хочу на консультацію!',
       button_url: link
     },
 
     {
       type: 'videos_then_button',
+      parse_mode: 'HTML',
       videos: [
         'BAACAgIAAxkBAANUaeK7AjEuTv_LnA38bQ6Z3hRUbUMAAtWQAAL9DxlLGC5f7Jp18wABOwQ',
         'BAACAgIAAxkBAANVaeK7zdmye-eKlY0AAXoNU_T6UOwBAALWkAAC_Q8ZS7cTu_PxJ1n-OwQ',
@@ -463,10 +478,11 @@ function getWarmupPosts(leadToken) {
         'BAACAgIAAxkBAANYaeK8F2edqsoyOoT9esVT5j7VkX0AAtmQAAL9DxlLGBW_RXFBagE7BA'
       ],
       followup_text:
-`Думаєте, що ваша ніша занадто вузька? Просто подивіться ці відео.
-Наш Клуб працює із сотнями ніш! І кожен з підприємців отримує круті результати.
+`<b>Думаєте, що ваша ніша <i><u>занадто вузька?</i></u></b>
+Просто подивіться ці відео.
+<i>Наш Клуб працює із <u>сотнями ніш!</u> І кожен з підприємців отримує круті результати.</i>
 
-Якщо ви шукаєте оточення, де кожен знає, як збільшити прибуток свого бізнесу — чекаємо вас у Конс на Бі$ 😉`,
+Якщо ви шукаєте оточення, де кожен знає, як збільшити прибуток свого бізнесу — <i>чекаємо вас у Конс на Бі$!</i>`,
       button_text: 'ХОЧУ В КЛУБ!',
       button_url: link
     },
@@ -515,19 +531,21 @@ function getWarmupPosts(leadToken) {
 
     {
       type: 'video_then_button',
+      parse_mode: 'HTML',
       video: 'BAACAgIAAxkBAANZaeLAA4JL59LMaM1K7OzXLbKuWasAAtqQAAL9DxlLCgQHcgo8B6c7BA',
       followup_text:
-`Як бачите, Конс на Бі$ викликає довіру!
-І якщо ви хочете дізнатись, як ваш бізнес може змінитись завдяки нашому навчанню — заповнюйте анкету тут👇🏻`,
+`<b>Як бачите, Конс на Бі$ викликає довіру!</b>
+І якщо ви хочете дізнатись, як ваш бізнес може змінитись завдяки нашому навчанню — <i><u>заповнюйте анкету тут</u></i>👇🏻`,
       button_text: 'ХОЧУ В КЛУБ!',
       button_url: link
     },
 
     {
       type: 'text',
+      parse_mode: 'HTML',
       text:
-`Ми знаємо, що ви зберегли відео, але так і не проглянули його…
-В той час як ваші конкуренти уже долучаються до нашого Клубу та роблять свої перші результати!`
+`<i>Ми знаємо, що ви зберегли відео, але так і не проглянули його…</i>
+В той час як ваші конкуренти уже долучаються до нашого Клубу та <b>роблять свої перші результати!</b>`
     },
 
     {
@@ -537,14 +555,15 @@ function getWarmupPosts(leadToken) {
       followup_text:
 `<b>Все ще сумніваєтесь, що ваша ніша не підходить?</b>
 Подивіться, скільки підприємців приходить до нас із нестандартними нішами ⬆️
-Але завдяки отриманим знанням у Клубі вони знають, як можна зростати в прибутку і масштабуватись!`
+Але завдяки отриманим знанням у Клубі вони знають, як можна <b>зростати в прибутку і масштабуватись!</b>`
     },
 
     {
       type: 'button_text',
+      parse_mode: 'HTML',
       text:
-`Якщо ви навіть не можете переглянути відео від нас, то не дивуйтесь, що ваші конкуренти виграють!
-Щоб бути на крок попереду, почніть діяти вже ЗАРАЗ! Це ваш останній шанс потрапити в наш Клуб!`,
+`<i>Якщо ви навіть не можете переглянути відео від нас, то не дивуйтесь, що <b>ваші конкуренти виграють!</b></i>
+Щоб бути на <i><b>крок попереду,</b></i> почніть діяти вже ЗАРАЗ! Це ваш останній шанс потрапити в наш Клуб!`,
       button_text: 'Заповнюйте анкету ТУТ!',
       button_url: link
     }
@@ -573,6 +592,15 @@ async function sendPostToUser(user) {
     });
   }
 
+  if (post.type === 'photo_with_text') {
+    await telegram('sendPhoto', {
+      chat_id: user.chat_id,
+      photo: post.photo,
+      caption: post.text,
+      parse_mode: post.parse_mode || undefined
+    });
+  }
+
   if (post.type === 'button_text') {
     await telegram('sendMessage', {
       chat_id: user.chat_id,
@@ -586,21 +614,22 @@ async function sendPostToUser(user) {
   }
 
   if (post.type === 'media_group_then_button') {
-    await telegram('sendMediaGroup', {
-      chat_id: user.chat_id,
-      media: post.media
-    });
+  await telegram('sendMediaGroup', {
+    chat_id: user.chat_id,
+    media: post.media
+  });
 
-    await telegram('sendMessage', {
-      chat_id: user.chat_id,
-      text: post.followup_text,
-      reply_markup: {
-        inline_keyboard: [
-          [{ text: post.button_text, url: post.button_url }]
-        ]
-      }
-    });
-  }
+  await telegram('sendMessage', {
+    chat_id: user.chat_id,
+    text: post.followup_text,
+    ...(post.parse_mode ? { parse_mode: post.parse_mode } : {}),
+    reply_markup: {
+      inline_keyboard: [
+        [{ text: post.button_text, url: post.button_url }]
+      ]
+    }
+  });
+}
 
   if (post.type === 'media_group_then_button_text') {
     await telegram('sendMediaGroup', {
@@ -627,6 +656,7 @@ async function sendPostToUser(user) {
       chat_id: user.chat_id,
       video: videoId
     });
+    await new Promise(r => setTimeout(r, 700));
   }
 
   await telegram('sendMessage', {
@@ -708,18 +738,6 @@ function addMinutes(date, minutes) {
   return new Date(date.getTime() + minutes * 60000);
 }
 
-function scheduleFirstMessageTime() {
-  return addMinutes(new Date(), 5).toISOString();
-}
-
-function scheduleNextByStep(step) {
-  const now = new Date();
-
-  if (step === 1) return addMinutes(now, 60).toISOString();
-  if (step === 2) return addMinutes(now, 24 * 60).toISOString();
-
-  return null;
-}
 
 app.get('/', (req, res) => {
   res.json({ ok: true, service: 'tg-warmup-bot' });
@@ -852,8 +870,9 @@ app.post('/telegram/webhook', async (req, res) => {
       await telegram('sendPhoto', {
         chat_id: chatId,
         photo: 'https://i.ibb.co/7h4WjNn/image.png',
+        parse_mode: 'HTML',
         caption:
-`Вас вітає український Бізнес-Клуб для підприємців «Конс на Бі$»!
+`Вас вітає український Бізнес-Клуб для підприємців <b>«Конс на Бі$»</b>!
 Місце, яке викликає у підприємців звичку ПОСТІЙНО ЗРОСТАТИ🔥`,
         reply_markup: {
           inline_keyboard: [
