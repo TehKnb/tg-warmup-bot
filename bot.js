@@ -147,6 +147,7 @@ async function sendAllPosts(chatId, telegramUserId) {
       await telegram('sendMessage', {
         chat_id: chatId,
         text: post.text,
+        ...(post.parse_mode ? { parse_mode: post.parse_mode } : {}),
         reply_markup: {
           inline_keyboard: [
             [{ text: post.button_text, url: post.button_url }]
@@ -164,6 +165,7 @@ async function sendAllPosts(chatId, telegramUserId) {
       await telegram('sendMessage', {
         chat_id: chatId,
         text: post.followup_text,
+        ...(post.parse_mode ? { parse_mode: post.parse_mode } : {}),
         reply_markup: {
           inline_keyboard: [
             [{ text: post.button_text, url: post.button_url }]
@@ -203,6 +205,7 @@ async function sendAllPosts(chatId, telegramUserId) {
       await telegram('sendMessage', {
         chat_id: chatId,
         text: post.followup_text,
+        ...(post.parse_mode ? { parse_mode: post.parse_mode } : {}),
         reply_markup: {
           inline_keyboard: [
             [{ text: post.button_text, url: post.button_url }]
@@ -222,6 +225,7 @@ async function sendAllPosts(chatId, telegramUserId) {
       await telegram('sendMessage', {
         chat_id: chatId,
         text: post.followup_text,
+        ...(post.parse_mode ? { parse_mode: post.parse_mode } : {}),
         reply_markup: {
           inline_keyboard: [
             [{ text: post.button_text, url: post.button_url }]
@@ -478,7 +482,7 @@ function getWarmupPosts(leadToken) {
         'BAACAgIAAxkBAANYaeK8F2edqsoyOoT9esVT5j7VkX0AAtmQAAL9DxlLGBW_RXFBagE7BA'
       ],
       followup_text:
-`<b>Думаєте, що ваша ніша <i><u>занадто вузька?</i></u></b>
+`<b>Думаєте, що ваша ніша <i><u>занадто вузька?</u></i></b>
 Просто подивіться ці відео.
 <i>Наш Клуб працює із <u>сотнями ніш!</u> І кожен з підприємців отримує круті результати.</i>
 
@@ -605,6 +609,7 @@ async function sendPostToUser(user) {
     await telegram('sendMessage', {
       chat_id: user.chat_id,
       text: post.text,
+      ...(post.parse_mode ? { parse_mode: post.parse_mode } : {}),
       reply_markup: {
         inline_keyboard: [
           [{ text: post.button_text, url: post.button_url }]
@@ -662,6 +667,7 @@ async function sendPostToUser(user) {
   await telegram('sendMessage', {
     chat_id: user.chat_id,
     text: post.followup_text,
+    ...(post.parse_mode ? { parse_mode: post.parse_mode } : {}),
     reply_markup: {
       inline_keyboard: [
         [{ text: post.button_text, url: post.button_url }]
@@ -681,6 +687,7 @@ async function sendPostToUser(user) {
     await telegram('sendMessage', {
       chat_id: user.chat_id,
       text: post.followup_text,
+      ...(post.parse_mode ? { parse_mode: post.parse_mode } : {}),
       reply_markup: {
         inline_keyboard: [
           [{ text: post.button_text, url: post.button_url }]
@@ -923,7 +930,7 @@ app.post('/telegram/webhook', async (req, res) => {
                next_message_at = $1,
                last_sent_step = 0
            WHERE telegram_user_id = $2`,
-          [scheduleFirstMessageTime(), telegramUserId]
+          [getNextSlotDateUtc(), telegramUserId]
         );
 
         await telegram('sendMessage', {
