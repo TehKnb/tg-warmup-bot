@@ -129,6 +129,8 @@ function getKyivNowParts() {
     hourCycle: 'h23'
   });
 
+
+
   const parts = formatter.formatToParts(new Date());
   const map = {};
 
@@ -145,6 +147,36 @@ function getKyivNowParts() {
     hour: Number(map.hour),
     minute: Number(map.minute)
   };
+}
+
+function isWorkingTimeKyiv() {
+  const now = new Date();
+
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Europe/Kyiv',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23'
+  });
+
+  const parts = formatter.formatToParts(now);
+  const map = {};
+
+  for (const part of parts) {
+    if (part.type !== 'literal') {
+      map[part.type] = part.value;
+    }
+  }
+
+  const hour = Number(map.hour);
+  const minute = Number(map.minute);
+
+  const totalMinutes = hour * 60 + minute;
+
+  const start = 9 * 60;       // 09:00
+  const end = 18 * 60 + 55;   // 18:55
+
+  return totalMinutes >= start && totalMinutes <= end;
 }
 
 function getSlotLabel(hour) {
@@ -953,13 +985,20 @@ app.post('/telegram/webhook', async (req, res) => {
           name
         });
 
-        await telegram('sendMessage', {
-          chat_id: chatId,
-          text: 'Дякуємо! Менеджер зв’яжеться з вами найближчим часом.',
-          reply_markup: {
-            remove_keyboard: true
-          }
-        });
+      const isWorking = isWorkingTimeKyiv();
+
+      const successText = isWorking
+        ? '✅ Вашу заявку прийнято, очікуйте дзвінка!'
+        : `✅Вашу заявку прийнято!
+      Наші менеджери зараз не працюють, але ми обов’язково зв’яжемось з вами в робочий час.`;
+
+      await telegram('sendMessage', {
+        chat_id: chatId,
+        text: successText,
+        reply_markup: {
+          remove_keyboard: true
+        }
+      });
       } catch (error) {
         console.error('CRM CONTACT SEND ERROR:', error);
 
