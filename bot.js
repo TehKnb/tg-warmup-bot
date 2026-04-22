@@ -12,6 +12,7 @@ const BASE_URL = process.env.BASE_URL;
 const LANDING_URL = process.env.LANDING_URL;
 const CHANNEL_ID = process.env.CHANNEL_ID;
 const CHANNEL_URL = process.env.CHANNEL_URL;
+const CRM_WEBHOOK_URL = process.env.CRM_WEBHOOK_URL;
 const PORT = process.env.PORT || 3000;
 
 function generateToken() {
@@ -51,6 +52,57 @@ async function getChatMember(chatId, userId) {
   return telegram('getChatMember', {
     chat_id: chatId,
     user_id: Number(userId)
+  });
+}
+
+async function sendLeadToCrm({ leadToken, phone, name }) {
+  if (!CRM_WEBHOOK_URL) {
+    throw new Error('CRM_WEBHOOK_URL is not set');
+  }
+
+  const payload = {
+    Leadname: 'Заявка на безкоштовну консультацію: Персональний розбір бізнесу, тепла, ТГ-бот',
+    Source: 'Заявка на безкоштовну консультацію (Персональний розбір бізнесу, тепла, ТГ-бот)',
+    sitename: 'ТГ-бот @knb_lead_bot',
+    'Lead Token': leadToken,
+    Phone: phone,
+    Name: name
+  };
+
+  const res = await fetch(CRM_WEBHOOK_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(payload)
+  });
+
+  const text = await res.text();
+
+  if (!res.ok) {
+    throw new Error(`CRM webhook error: ${res.status} ${text}`);
+  }
+
+  console.log('CRM LEAD SENT:', payload);
+}
+
+async function askForContact(chatId) {
+  await telegram('sendMessage', {
+    chat_id: chatId,
+    text: `Маєте питання і хочете дізнатись більше?
+Залиште номер — менеджер зв’яжеться найближчим часом.`,
+    reply_markup: {
+      keyboard: [
+        [
+          {
+            text: 'Надіслати контакт',
+            request_contact: true
+          }
+        ]
+      ],
+      resize_keyboard: true,
+      one_time_keyboard: true
+    }
   });
 }
 
@@ -861,6 +913,69 @@ app.post('/telegram/webhook', async (req, res) => {
       return res.sendStatus(200);
     }
 
+    if (update.message && update.message.contact) {
+      const message = update.message;
+      const chatId = String(message.chat.id);
+      const telegramUserId = String(message.from.id);
+      const contact = message.contact;
+
+      const result = await pool.query(
+        `SELECT lead_token, first_name
+        FROM users
+        WHERE telegram_user_id = $1`,
+        [telegramUserId]
+      );
+
+      const user = result.rows[0];
+
+      if (!user) {
+        await telegram('sendMessage', {
+          chat_id: chatId,
+          text: 'Спочатку натисніть /start',
+          reply_markup: {
+            remove_keyboard: true
+          }
+        });
+
+        return res.sendStatus(200);
+      }
+
+      const phone = contact.phone_number || '';
+      const name =
+        [contact.first_name, contact.last_name].filter(Boolean).join(' ') ||
+        user.first_name ||
+        'Без імені';
+
+      try {
+        await sendLeadToCrm({
+          leadToken: user.lead_token,
+          phone,
+          name
+        });
+
+        await telegram('sendMessage', {
+          chat_id: chatId,
+          text: 'Дякуємо! Менеджер зв’яжеться з вами найближчим часом.',
+          reply_markup: {
+            remove_keyboard: true
+          }
+        });
+      } catch (error) {
+        console.error('CRM CONTACT SEND ERROR:', error);
+
+        await telegram('sendMessage', {
+          chat_id: chatId,
+          text: 'Не вдалося передати контакт. Спробуйте ще раз трохи пізніше.',
+          reply_markup: {
+            remove_keyboard: true
+          }
+        });
+      }
+    
+
+      return res.sendStatus(200);
+    }
+
     // 2. звичайні повідомлення
     if (!update.message || !update.message.text) {
       return res.sendStatus(200);
@@ -974,6 +1089,11 @@ app.post('/telegram/webhook', async (req, res) => {
         });
       }
 
+      return res.sendStatus(200);
+    }
+
+    if (!text.startsWith('/')) {
+      await askForContact(chatId);
       return res.sendStatus(200);
     }
 
