@@ -180,8 +180,8 @@ function isWorkingTimeKyiv() {
 }
 
 function getSlotLabel(hour) {
-  if (hour === 11) return '11:00';
-  if (hour === 15) return '15:00';
+  if (hour === 10) return '10:00';
+  if (hour === 14) return '14:00';
   if (hour === 18) return '18:00';
   return null;
 }
@@ -375,21 +375,22 @@ function getNextSlotDateUtc(fromDate = new Date()) {
     };
   }
 
-  const slots = [11, 15, 18];
-  const nowKyiv = getParts(fromDate);
+  const now = getParts(fromDate);
 
-  for (const slotHour of slots) {
-    if (
-      nowKyiv.hour < slotHour ||
-      (nowKyiv.hour === slotHour && nowKyiv.minute === 0 && nowKyiv.second === 0)
-    ) {
-      return kyivLocalToUtc(nowKyiv.year, nowKyiv.month, nowKyiv.day, slotHour, 0, 0);
-    }
+  const slots = [10, 14, 18];
+
+  const isBefore9 = now.hour < 9;
+
+  // 🔥 якщо до 09:00 → сьогодні
+  if (isBefore9) {
+    return kyivLocalToUtc(now.year, now.month, now.day, 10, 0, 0);
   }
 
+  // 🔥 якщо після 09:00 → завтра 10:00
   const tomorrow = new Date(fromDate.getTime() + 24 * 60 * 60 * 1000);
   const t = getParts(tomorrow);
-  return kyivLocalToUtc(t.year, t.month, t.day, 11, 0, 0);
+
+  return kyivLocalToUtc(t.year, t.month, t.day, 10, 0, 0);
 }
 
 function kyivLocalToUtc(year, month, day, hour, minute, second) {
