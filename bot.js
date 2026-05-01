@@ -518,18 +518,10 @@ function getWarmupPosts(leadToken) {
       type: 'videos_then_button',
       parse_mode: 'HTML',
       videos: [
-        'BAACAgIAAxkBAANUaeK7AjEuTv_LnA38bQ6Z3hRUbUMAAtWQAAL9DxlLGC5f7Jp18wABOwQ',
-        'BAACAgIAAxkBAANVaeK7zdmye-eKlY0AAXoNU_T6UOwBAALWkAAC_Q8ZS7cTu_PxJ1n-OwQ',
-        'BAACAgIAAxkBAANWaeK75CMGXQLznHYx274DLGoFjb4AAteQAAL9DxlLE0AAAZhJufJOOwQ',
-        'BAACAgIAAxkBAANXaeK8B1GpG-GK7LW4yH-PAAGqtaTfAALYkAAC_Q8ZS4xvIVfshALqOwQ',
-        'BAACAgIAAxkBAANYaeK8F2edqsoyOoT9esVT5j7VkX0AAtmQAAL9DxlLGBW_RXFBagE7BA'
+        'BAACAgIAAxkBAAIB-Wn1DNdqsom3q2uPgBqPxwKSbYUsAAI_qAACauaoS0_Kwrp9BpRPOwQ'
       ],
       followup_text:
-`<b>Думаєте, що ваша ніша <i><u>занадто вузька?</u></i></b>
-Просто подивіться ці відео.
-<i>Наш Клуб працює із <u>сотнями ніш!</u> І кожен з підприємців отримує круті результати.</i>
-
-Якщо ви шукаєте оточення, де кожен знає, як збільшити прибуток свого бізнесу — <i>чекаємо вас у Конс на Бі$!</i>`,
+`<i>Заповнюйте анкету для консультації щодо навчання <b>ТУТ</b>👇🏻</i>`,
       button_text: 'ХОЧУ В КЛУБ!',
       button_url: link
     },
@@ -557,26 +549,35 @@ function getWarmupPosts(leadToken) {
       type: 'media_group_then_button',
       parse_mode: 'HTML',
       media: [
-        { type: 'photo', media: 'https://i.ibb.co/ZpCqjTMF/image.png' },
-        { type: 'photo', media: 'https://i.ibb.co/SX5LJ6nn/image.png' },
-        { type: 'photo', media: 'https://i.ibb.co/9kXqMJNQ/image.png' },
-        { type: 'photo', media: 'https://i.ibb.co/4gXRndCg/image.png' }
+        { type: 'photo', media: 'https://i.ibb.co/W4pbDKzB/Instagram-post-326.png' },
+        { type: 'photo', media: 'https://i.ibb.co/Y7Zvk22y/Instagram-post-324.png' },
+        { type: 'photo', media: 'https://i.ibb.co/whHrW9ty/Instagram-post-325.png' },
+        { type: 'photo', media: 'https://i.ibb.co/0VQyzrDP/Instagram-post-323.png' }
       ],
-      followup_text: '<b>Хочете мати такі ж результати?</b>',
+      followup_text:
+    `📱 Ось такі результати отримують наші підприємці, які пройшли 7-тижневу програму та впровадили Instagram у свій бізнес!
+
+    На 4 модулі <i><b>«Instagram як система»</b></i> нашого 7-тижневого навчання підприємці вивчають, як:
+
+    <i>• вибудувати керований потік клієнтів з Instagram
+
+    • обрати стратегію просування під свою нішу
+
+    • запустити рекламу, яка починає приносити заявки вже під час навчання!</i>
+
+    <b>Хочете розібратись у продажах в Instagram і мати такі ж результати?</b>`,
       button_text: 'Заповнюйте анкету тут!',
       button_url: link
     },
-
 
     {
       type: 'media_group_then_button_text',
       parse_mode: 'HTML',
       media: [
-        { type: 'photo', media: 'https://i.ibb.co/mrdvPnRY/image-2026-04-17-12-45-18.jpg' },
-        { type: 'photo', media: 'https://i.ibb.co/FbMk9qbK/photo-2026-04-17-12-47-03.jpg' }
+        { type: 'photo', media: 'https://i.ibb.co/zVBs87n5/IMG-5881.png' },
       ],
       followup_text:
-`А ХТО ЩЕ З ЕКСПЕРТІВ СУПРОВОДЖУЄ ПІДПРИЄМЦІВ У НАВЧАННІ?
+`<b>А ХТО З ЕКСПЕРТІВ СУПРОВОДЖУЄ ПІДПРИЄМЦІВ НА НАВЧАННІ У <i>СФЕРІ МАРКЕТИНГУ?</i></b>
 
 <u><b>АННА МОРОЗОВА</b></u>
 співзасновниця нашого Бізнес-Клубу
@@ -595,17 +596,7 @@ function getWarmupPosts(leadToken) {
 Жанна — учениця Олександра Морозова.
 І усе, що вона передає підприємцям сьогодні — це практичні поради, які є результатом довгої та складної роботи: аналізу, пошуку ідей та форматів та постійного тестування.
 
-ДЕ МОЖНА ПОЧУТИ ЖАННУ?
-На 1 модулі “Магія ефективного маркетингу” та 4 модулі «Instagram як система»
-
-а також практикумах:
-• «Instagram під ключ 4.0»
-• «SMM-спеціаліст у вашому бізнесі»
-• «Зелені воронки: креативи, що працюють»
-• «Контент-ревізія сторінок Instagram»
-• «Взаємодія контент-відділу та відділу трафіку» (2 частини)
-
-<u><b>А більше про інших спікерів ви зможете дізнатись тут:</b></u>`,
+<u><b>Більше про інших спікерів ви зможете дізнатись тут:</b></u>`,
       button_text: 'ПРО СПІКЕРІВ КЛУБУ',
       button_url: 'https://t.me/c/3538911047/8'
     },
