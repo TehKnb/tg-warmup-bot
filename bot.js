@@ -227,6 +227,25 @@ async function sendAllPosts(chatId, telegramUserId) {
       });
     }
 
+    if (post.type === 'photo_then_button') {
+      await telegram('sendPhoto', {
+        chat_id: chatId,
+        photo: post.photo,
+        caption: post.text,
+        parse_mode: post.parse_mode || undefined
+      });
+
+      await telegram('sendMessage', {
+        chat_id: chatId,
+        text: post.button_text_label || '👇',
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: post.button_text, url: post.button_url }]
+          ]
+        }
+      });
+    }
+
     if (post.type === 'button_text') {
       await telegram('sendMessage', {
         chat_id: chatId,
@@ -571,12 +590,10 @@ function getWarmupPosts(leadToken) {
     },
 
     {
-      type: 'photo_with_text',
+      type: 'photo_then_button',
       parse_mode: 'HTML',
-      media: [
-        { type: 'photo', media: 'https://i.ibb.co/zVBs87n5/IMG-5881.png' },
-      ],
-      followup_text:
+      photo: 'https://i.ibb.co/zVBs87n5/IMG-5881.png',
+      text:
 `<b>А ХТО З ЕКСПЕРТІВ СУПРОВОДЖУЄ ПІДПРИЄМЦІВ НА НАВЧАННІ У <i>СФЕРІ МАРКЕТИНГУ?</i></b>
 
 <u><b>АННА МОРОЗОВА</b></u>
@@ -600,6 +617,7 @@ function getWarmupPosts(leadToken) {
       button_text: 'ПРО СПІКЕРІВ КЛУБУ',
       button_url: 'https://t.me/c/3538911047/8'
     },
+
 
     {
       type: 'video_then_button',
