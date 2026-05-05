@@ -390,9 +390,11 @@ function getNextSlotDateUtc(fromDate = new Date()) {
   function getParts(date) {
     const parts = kyivFormatter.formatToParts(date);
     const map = {};
+
     for (const part of parts) {
       if (part.type !== 'literal') map[part.type] = part.value;
     }
+
     return {
       year: Number(map.year),
       month: Number(map.month),
@@ -404,17 +406,16 @@ function getNextSlotDateUtc(fromDate = new Date()) {
   }
 
   const now = getParts(fromDate);
-
   const slots = [10, 14, 18];
 
-  const isBefore9 = now.hour < 9;
+  for (const hour of slots) {
+    const slotUtc = kyivLocalToUtc(now.year, now.month, now.day, hour, 0, 0);
 
-  // 🔥 якщо до 09:00 → сьогодні
-  if (isBefore9) {
-    return kyivLocalToUtc(now.year, now.month, now.day, 10, 0, 0);
+    if (slotUtc > fromDate) {
+      return slotUtc;
+    }
   }
 
-  // 🔥 якщо після 09:00 → завтра 10:00
   const tomorrow = new Date(fromDate.getTime() + 24 * 60 * 60 * 1000);
   const t = getParts(tomorrow);
 
@@ -707,6 +708,25 @@ async function sendPostToUser(user) {
       parse_mode: post.parse_mode || undefined
     });
   }
+
+  if (post.type === 'photo_then_button') {
+  await telegram('sendPhoto', {
+    chat_id: user.chat_id,
+    photo: post.photo,
+    caption: post.text,
+    parse_mode: post.parse_mode || undefined
+  });
+
+  await telegram('sendMessage', {
+    chat_id: user.chat_id,
+    text: post.button_text_label || '👇',
+    reply_markup: {
+      inline_keyboard: [
+        [{ text: post.button_text, url: post.button_url }]
+      ]
+    }
+  });
+}
 
   if (post.type === 'button_text') {
     await telegram('sendMessage', {
@@ -1126,7 +1146,7 @@ if (!user) {
       return res.sendStatus(200);
     }
 
-    if (text === '/posts') {
+    if (text === '/posts' || text.startsWith('/posts@')) {
       await sendAllPosts(chatId, telegramUserId);
       return res.sendStatus(200);
     }
