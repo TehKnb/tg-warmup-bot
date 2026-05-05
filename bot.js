@@ -1147,6 +1147,11 @@ if (!user) {
     }
 
     if (text === '/posts' || text.startsWith('/posts@')) {
+        await telegram('sendMessage', {
+          chat_id: chatId,
+          text: 'Тестова розсилка запущена один раз.'
+        });
+
       await sendAllPosts(chatId, telegramUserId);
       return res.sendStatus(200);
     }
