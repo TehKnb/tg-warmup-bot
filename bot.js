@@ -1342,24 +1342,48 @@ cron.schedule('* * * * *', async () => {
     const users = result.rows;
 
     for (const user of users) {
-      if (user.status === 'awaiting_subscription') {
-        await sendSubscriptionReminder(user);
+  try {
 
-        await pool.query(
-          `UPDATE users SET last_slot_key = $1 WHERE id = $2`,
-          [slotKey, user.id]
-        );
-      }
+    if (user.status === 'awaiting_subscription') {
+      await sendSubscriptionReminder(user);
 
-      if (user.status === 'warming') {
-        await sendPostToUser(user);
-
-        await pool.query(
-          `UPDATE users SET last_slot_key = $1 WHERE id = $2`,
-          [slotKey, user.id]
-        );
-      }
+      await pool.query(
+        `UPDATE users SET last_slot_key = $1 WHERE id = $2`,
+        [slotKey, user.id]
+      );
     }
+
+    if (user.status === 'warming') {
+      await sendPostToUser(user);
+
+      await pool.query(
+        `UPDATE users SET last_slot_key = $1 WHERE id = $2`,
+        [slotKey, user.id]
+      );
+    }
+
+  } catch (error) {
+
+    const errorText = String(error.message || '');
+
+    if (errorText.includes('bot was blocked by the user')) {
+
+      console.log(`USER BLOCKED BOT: ${user.telegram_user_id}`);
+
+      await pool.query(
+        `UPDATE users
+         SET status = 'blocked',
+             next_message_at = NULL
+         WHERE id = $1`,
+        [user.id]
+      );
+
+      continue;
+    }
+
+    console.error('USER SEND ERROR:', error);
+  }
+}
   } catch (error) {
     console.error('CRON ERROR:', error);
   }
